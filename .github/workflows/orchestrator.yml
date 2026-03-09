@@ -1,78 +1,58 @@
-# .github/workflows/dr-orchestrator.yml
-name: Fabric DR Orchestrator
+name: Fabric DR Orchestrator v2
 
 on:
   workflow_dispatch:
-    inputs:
-      repos_json:
-        description: 'JSON array of repos to recover. Example: ["org/repo1","org/repo2"]'
-        required: true
-        type: string
-      workspace_prefix:
-        description: 'Prefix for newly created workspaces'
-        required: true
-        type: string
 
 jobs:
   build-matrix:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.set.outputs.matrix }}
+      matrix: ${{ steps.set_matrix.outputs.matrix }}
     steps:
-      - id: set
-        run: |
-          # Transform input list into a matrix object GitHub understands:
-          # { "include": [ {"repo":"org/repo1"}, {"repo":"org/repo2"} ] }
-          python - << 'PY'
-          import json, os
-          repos = json.loads(os.environ["REPOS"])
-          matrix = {"include": [{"repo": r} for r in repos]}
-          print(f"matrix={json.dumps(matrix)}")
-          PY
-        env:
-          REPOS: ${{ inputs.repos_json }}
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+
+      - name: Read workspaces JSON and expose as matrix
+        id: set_matrix
         shell: bash
-      - name: Export output
-        id: set2
         run: |
           python - << 'PY'
-          import json, os
-          repos = json.loads(os.environ["REPOS"])
-          matrix = {"include": [{"repo": r} for r in repos]}
-          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-            f.write("matrix=" + json.dumps(matrix) + "\n")
+          import json
+          import os
+          from pathlib import Path
+
+          file_path = Path(".github/fabricdr/workspaces.json")
+          if not file_path.exists():
+              raise SystemExit(f"File not found: {file_path}")
+
+          data = json.loads(file_path.read_text(encoding="utf-8"))
+
+          if not isinstance(data, list):
+              raise SystemExit("workspaces.json must contain a JSON array")
+
+          if len(data) == 0:
+              raise SystemExit("workspaces.json is empty")
+
+          for i, item in enumerate(data):
+              if "repo" not in item:
+                  raise SystemExit(f"Entry #{i} is missing required field: repo")
+              if "workspace_name" not in item:
+                  raise SystemExit(f"Entry #{i} is missing required field: workspace_name")
+
+          matrix = {"include": data}
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write("matrix=" + json.dumps(matrix) + "\n")
           PY
-        env:
-          REPOS: ${{ inputs.repos_json }}
 
   recover-each:
     needs: build-matrix
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
-
-    steps:
-      - name: Create new Fabric workspace
-        id: create_ws
-        run: |
-          echo "Creating workspace for repo: ${{ matrix.repo }}"
-
-          # 1) Acquire token (example using client credentials)
-          # 2) POST to Fabric to create workspace
-          # 3) Extract workspace id and set it as output
-          #
-          # Replace these with your real Fabric API calls.
-
-          NEW_WS_ID="00000000-0000-0000-0000-000000000000"
-          echo "workspace_id=$NEW_WS_ID" >> "$GITHUB_OUTPUT"
-
-      - name: Call reusable deploy workflow (Workflow A)
-        uses: ./.github/workflows/deploy-fabric-workspace.yml
-        with:
-          repo_url: ${{ matrix.repo }}
-          workspace_id: ${{ steps.create_ws.outputs.workspace_id }}
-        #secrets:
-          #FABRIC_TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
-          #FABRIC_CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
-          #FABRIC_CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+    uses: ./.github/workflows/workflowa.yml
+    with:
+      repo_url: ${{ matrix.repo }}
+      workspace_name: ${{ matrix.workspace_name }}
+    secrets: inherit
