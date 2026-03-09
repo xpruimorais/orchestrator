@@ -21,7 +21,7 @@ jobs:
           import os
           from pathlib import Path
 
-          file_path = Path(".github/fabricdr/workspaces.json")
+          file_path = Path(".github/fabric-dr/workspaces.json")
           if not file_path.exists():
               raise SystemExit(f"File not found: {file_path}")
 
@@ -42,16 +42,76 @@ jobs:
           print(json.dumps(matrix, indent=2))
           PY
 
-  hello-each-workspace:
+  create-each-workspace:
     needs: build-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
 
     steps:
-      - name: Hello world for each workspace
+      - name: Show current matrix entry
         run: |
-          echo "Hello from matrix job"
-          echo "Repo: ${{ matrix.repo }}"
-          echo "Workspace name: ${{ matrix.workspace_name }}"
+          echo "repo            = ${{ matrix.repo }}"
+          echo "workspace_name  = ${{ matrix.workspace_name }}"
+
+      - name: Get Fabric access token
+        id: get_token
+        shell: bash
+        env:
+          TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+          CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+
+          TOKEN_RESPONSE=$(curl -sS -X POST "https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "client_id=${CLIENT_ID}" \
+            --data-urlencode "client_secret=${CLIENT_SECRET}" \
+            --data-urlencode "grant_type=client_credentials" \
+            --data-urlencode "scope=https://api.fabric.microsoft.com/.default")
+
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
+
+          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+            echo "Failed to obtain access token"
+            echo "$TOKEN_RESPONSE"
+            exit 1
+          fi
+
+          echo "access_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Create Fabric workspace
+        id: create_ws
+        shell: bash
+        env:
+          ACCESS_TOKEN: ${{ steps.get_token.outputs.access_token }}
+          WORKSPACE_NAME: ${{ matrix.workspace_name }}
+        run: |
+          set -euo pipefail
+
+          RESPONSE=$(curl -sS -X POST "https://api.fabric.microsoft.com/v1/workspaces" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg name "$WORKSPACE_NAME" '{displayName: $name}')")
+
+          echo "Create workspace response:"
+          echo "$RESPONSE"
+
+          WORKSPACE_ID=$(echo "$RESPONSE" | jq -r '.id')
+
+          if [ -z "$WORKSPACE_ID" ] || [ "$WORKSPACE_ID" = "null" ]; then
+            echo "Workspace ID not found in response"
+            exit 1
+          fi
+
+          echo "workspace_id=$WORKSPACE_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Hello world after create
+        run: |
+          echo "Workspace created successfully"
+          echo "repo            = ${{ matrix.repo }}"
+          echo "workspace_name  = ${{ matrix.workspace_name }}"
+          echo "workspace_id    = ${{ steps.create_ws.outputs.workspace_id }}"
