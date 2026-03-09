@@ -1,4 +1,4 @@
-name: Fabric DR Orchestrator v2
+name: Test Fabric DR Orchestrator
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
       - name: Checkout current repo
         uses: actions/checkout@v4
 
-      - name: Read workspaces JSON and expose as matrix
+      - name: Read JSON and build matrix
         id: set_matrix
         shell: bash
         run: |
@@ -33,22 +33,25 @@ jobs:
           if len(data) == 0:
               raise SystemExit("workspaces.json is empty")
 
-          for i, item in enumerate(data):
-              if "repo" not in item:
-                  raise SystemExit(f"Entry #{i} is missing required field: repo")
-              if "workspace_name" not in item:
-                  raise SystemExit(f"Entry #{i} is missing required field: workspace_name")
-
           matrix = {"include": data}
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write("matrix=" + json.dumps(matrix) + "\n")
+
+          print("Generated matrix:")
+          print(json.dumps(matrix, indent=2))
           PY
 
-  recover-each:
+  hello-each-workspace:
     needs: build-matrix
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 3
       matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
-    uses: ./.github/workflows/workflowa.yml
+
+    steps:
+      - name: Hello world for each workspace
+        run: |
+          echo "Hello from matrix job"
+          echo "Repo: ${{ matrix.repo }}"
+          echo "Workspace name: ${{ matrix.workspace_name }}"
