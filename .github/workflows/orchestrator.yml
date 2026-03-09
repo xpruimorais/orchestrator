@@ -1,4 +1,4 @@
-name: Fabric DR Orchestrator v2
+name: Fabric DR Orchestrator
 
 on:
   workflow_dispatch:
