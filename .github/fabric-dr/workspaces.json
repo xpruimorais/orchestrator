@@ -1,0 +1,10 @@
+[
+  {
+    "repo": "org/repo1",
+    "workspace_name": "new-repo1-dr"
+  },
+  {
+    "repo": "org/repo2",
+    "workspace_name": "new-repo2-dr"
+  }
+]
