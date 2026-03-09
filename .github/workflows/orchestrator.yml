@@ -1,58 +1,10 @@
-name: Fabric DR Orchestrator
+name: Test manual workflow
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-matrix:
+  test:
     runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set_matrix.outputs.matrix }}
     steps:
-      - name: Checkout current repo
-        uses: actions/checkout@v4
-
-      - name: Read workspaces JSON and expose as matrix
-        id: set_matrix
-        shell: bash
-        run: |
-          python - << 'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          file_path = Path(".github/fabricdr/workspaces.json")
-          if not file_path.exists():
-              raise SystemExit(f"File not found: {file_path}")
-
-          data = json.loads(file_path.read_text(encoding="utf-8"))
-
-          if not isinstance(data, list):
-              raise SystemExit("workspaces.json must contain a JSON array")
-
-          if len(data) == 0:
-              raise SystemExit("workspaces.json is empty")
-
-          for i, item in enumerate(data):
-              if "repo" not in item:
-                  raise SystemExit(f"Entry #{i} is missing required field: repo")
-              if "workspace_name" not in item:
-                  raise SystemExit(f"Entry #{i} is missing required field: workspace_name")
-
-          matrix = {"include": data}
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
-              f.write("matrix=" + json.dumps(matrix) + "\n")
-          PY
-
-  recover-each:
-    needs: build-matrix
-    strategy:
-      fail-fast: false
-      max-parallel: 3
-      matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
-    uses: ./.github/workflows/workflowa.yml
-    with:
-      repo_url: ${{ matrix.repo }}
-      workspace_name: ${{ matrix.workspace_name }}
-    secrets: inherit
+      - run: echo "hello"
