@@ -21,7 +21,7 @@ jobs:
           import os
           from pathlib import Path
 
-          file_path = Path(".github/fabric-dr/workspaces.json")
+          file_path = Path(".github/fabricdr/workspaces.json")
           if not file_path.exists():
               raise SystemExit(f"File not found: {file_path}")
 
@@ -51,7 +51,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
-    uses: ./.github/workflows/workflow-a.yml
+    uses: ./.github/workflows/workflowa.yml
     with:
       repo_url: ${{ matrix.repo }}
       workspace_name: ${{ matrix.workspace_name }}
