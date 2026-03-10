@@ -54,7 +54,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
-    uses: ./.github/workflows/recover-one-workspace.yml
+    uses: xpruimorais/orchestrator/.github/workflows/recover-one-workspace.yml@main
     with:
       workspace_name: ${{ matrix.workspace_name }}
       ado_repo_url: ${{ matrix.ado_repo_url }}
