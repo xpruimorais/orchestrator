@@ -88,6 +88,47 @@ jobs:
 
           echo "workspace_id=$WORKSPACE_ID" >> "$GITHUB_OUTPUT"
 
+      - name: Grant Admin role to security group
+        id: grant_group_admin
+        shell: bash
+        env:
+          ACCESS_TOKEN: ${{ steps.get_token.outputs.access_token }}
+          WORKSPACE_ID: ${{ steps.create_ws.outputs.workspace_id }}
+          GROUP_OBJECT_ID: ${{ secrets.FABRIC_ADMIN_GROUP_ID }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GROUP_OBJECT_ID}" ]; then
+            echo "FABRIC_ADMIN_GROUP_ID secret is empty"
+            exit 1
+          fi
+
+          RESPONSE=$(curl -sS -X POST "https://api.fabric.microsoft.com/v1/workspaces/${WORKSPACE_ID}/roleAssignments" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg principal_id "${GROUP_OBJECT_ID}" \
+              '{
+                principal: {
+                  id: $principal_id,
+                  type: "Group"
+                },
+                role: "Admin"
+              }'
+            )")
+
+          echo "Add workspace role assignment response:"
+          echo "$RESPONSE"
+
+          ROLE_ASSIGNMENT_ID=$(echo "$RESPONSE" | jq -r '.id')
+
+          if [ -z "$ROLE_ASSIGNMENT_ID" ] || [ "$ROLE_ASSIGNMENT_ID" = "null" ]; then
+            echo "Failed to create workspace role assignment"
+            exit 1
+          fi
+
+          echo "role_assignment_id=$ROLE_ASSIGNMENT_ID" >> "$GITHUB_OUTPUT"
+
   deploy-content:
     needs: create-workspace
     uses: ./.github/workflows/workflow-a.yml
