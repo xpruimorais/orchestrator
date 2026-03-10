@@ -1,10 +1,10 @@
 [
   {
-    "repo": "org/repo1",
-    "workspace_name": "new-repo1-dr"
+    "ado_repo_url": "https://dev.azure.com/myorg/myproject/_git/repo1",
+    "workspace_name": "dr-repo1"
   },
   {
-    "repo": "org/repo2",
-    "workspace_name": "new-repo2-dr"
+    "ado_repo_url": "https://dev.azure.com/myorg/myproject/_git/repo2",
+    "workspace_name": "dr-repo2"
   }
 ]

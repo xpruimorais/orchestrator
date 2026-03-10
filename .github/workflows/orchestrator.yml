@@ -1,4 +1,5 @@
-name: Test Fabric DR Orchestrator
+# .github/workflows/orchestrator.yml
+name: Fabric DR Orchestrator
 
 on:
   workflow_dispatch:
@@ -33,85 +34,30 @@ jobs:
           if len(data) == 0:
               raise SystemExit("workspaces.json is empty")
 
+          for i, item in enumerate(data):
+              if "ado_repo_url" not in item:
+                  raise SystemExit(f"Entry #{i} is missing ado_repo_url")
+              if "workspace_name" not in item:
+                  raise SystemExit(f"Entry #{i} is missing workspace_name")
+
           matrix = {"include": data}
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write("matrix=" + json.dumps(matrix) + "\n")
 
-          print("Generated matrix:")
           print(json.dumps(matrix, indent=2))
           PY
 
-  create-each-workspace:
+  recover-each:
     needs: build-matrix
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 3
       matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
-
-    steps:
-      - name: Show current matrix entry
-        run: |
-          echo "repo            = ${{ matrix.repo }}"
-          echo "workspace_name  = ${{ matrix.workspace_name }}"
-
-      - name: Get Fabric access token
-        id: get_token
-        shell: bash
-        env:
-          TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
-          CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
-        run: |
-          set -euo pipefail
-
-          TOKEN_RESPONSE=$(curl -sS -X POST "https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            --data-urlencode "client_id=${CLIENT_ID}" \
-            --data-urlencode "client_secret=${CLIENT_SECRET}" \
-            --data-urlencode "grant_type=client_credentials" \
-            --data-urlencode "scope=https://api.fabric.microsoft.com/.default")
-
-          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
-
-          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
-            echo "Failed to obtain access token"
-            echo "$TOKEN_RESPONSE"
-            exit 1
-          fi
-
-          echo "access_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
-
-      - name: Create Fabric workspace
-        id: create_ws
-        shell: bash
-        env:
-          ACCESS_TOKEN: ${{ steps.get_token.outputs.access_token }}
-          WORKSPACE_NAME: ${{ matrix.workspace_name }}
-        run: |
-          set -euo pipefail
-
-          RESPONSE=$(curl -sS -X POST "https://api.fabric.microsoft.com/v1/workspaces" \
-            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n --arg name "$WORKSPACE_NAME" '{displayName: $name}')")
-
-          echo "Create workspace response:"
-          echo "$RESPONSE"
-
-          WORKSPACE_ID=$(echo "$RESPONSE" | jq -r '.id')
-
-          if [ -z "$WORKSPACE_ID" ] || [ "$WORKSPACE_ID" = "null" ]; then
-            echo "Workspace ID not found in response"
-            exit 1
-          fi
-
-          echo "workspace_id=$WORKSPACE_ID" >> "$GITHUB_OUTPUT"
-
-      - name: Hello world after create
-        run: |
-          echo "Workspace created successfully"
-          echo "repo            = ${{ matrix.repo }}"
-          echo "workspace_name  = ${{ matrix.workspace_name }}"
-          echo "workspace_id    = ${{ steps.create_ws.outputs.workspace_id }}"
+    uses: ./.github/workflows/recover-one-workspace.yml
+    with:
+      workspace_name: ${{ matrix.workspace_name }}
+      ado_repo_url: ${{ matrix.ado_repo_url }}
+      log_level: info
+      force_delete: false
+    secrets: inherit

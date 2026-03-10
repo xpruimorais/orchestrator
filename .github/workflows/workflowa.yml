@@ -1,8 +1,42 @@
-name: hello-world
-on: push
+# .github/workflows/workflow-a.yml
+name: Deploy Fabric content
+
+on:
+  workflow_call:
+    inputs:
+      log_level:
+        required: true
+        type: string
+      force_delete:
+        required: true
+        type: boolean
+      ado_repo_url:
+        required: true
+        type: string
+      deploy_workspace_id:
+        required: true
+        type: string
+    secrets:
+      FABRIC_TENANT_ID:
+        required: true
+      FABRIC_CLIENT_ID:
+        required: true
+      FABRIC_CLIENT_SECRET:
+        required: true
+      ADO_PAT:
+        required: false
+
 jobs:
-  my-job:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: my-step
-        run: echo "Hello World!"
+      - name: Debug inputs
+        run: |
+          echo "log_level=${{ inputs.log_level }}"
+          echo "force_delete=${{ inputs.force_delete }}"
+          echo "ado_repo_url=${{ inputs.ado_repo_url }}"
+          echo "deploy_workspace_id=${{ inputs.deploy_workspace_id }}"
+
+      - name: Run existing deployment logic
+        run: |
+          echo "TODO: invoke your current deploy logic here"

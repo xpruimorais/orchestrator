@@ -1,0 +1,99 @@
+# .github/workflows/recover-one-workspace.yml
+name: Recover one Fabric workspace
+
+on:
+  workflow_call:
+    inputs:
+      workspace_name:
+        required: true
+        type: string
+      ado_repo_url:
+        required: true
+        type: string
+      log_level:
+        required: false
+        default: info
+        type: string
+      force_delete:
+        required: false
+        default: false
+        type: boolean
+    secrets:
+      FABRIC_TENANT_ID:
+        required: true
+      FABRIC_CLIENT_ID:
+        required: true
+      FABRIC_CLIENT_SECRET:
+        required: true
+      ADO_PAT:
+        required: false
+
+jobs:
+  create-workspace:
+    runs-on: ubuntu-latest
+    outputs:
+      workspace_id: ${{ steps.create_ws.outputs.workspace_id }}
+    steps:
+      - name: Get Fabric access token
+        id: get_token
+        shell: bash
+        env:
+          TENANT_ID: ${{ secrets.FABRIC_TENANT_ID }}
+          CLIENT_ID: ${{ secrets.FABRIC_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.FABRIC_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+
+          TOKEN_RESPONSE=$(curl -sS -X POST "https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            --data-urlencode "client_id=${CLIENT_ID}" \
+            --data-urlencode "client_secret=${CLIENT_SECRET}" \
+            --data-urlencode "grant_type=client_credentials" \
+            --data-urlencode "scope=https://api.fabric.microsoft.com/.default")
+
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
+
+          if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+            echo "Failed to obtain token"
+            echo "$TOKEN_RESPONSE"
+            exit 1
+          fi
+
+          echo "::add-mask::$ACCESS_TOKEN"
+          echo "access_token=$ACCESS_TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Create Fabric workspace
+        id: create_ws
+        shell: bash
+        env:
+          ACCESS_TOKEN: ${{ steps.get_token.outputs.access_token }}
+          WORKSPACE_NAME: ${{ inputs.workspace_name }}
+        run: |
+          set -euo pipefail
+
+          RESPONSE=$(curl -sS -X POST "https://api.fabric.microsoft.com/v1/workspaces" \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg name "$WORKSPACE_NAME" '{displayName: $name}')")
+
+          echo "Create workspace raw response:"
+          echo "$RESPONSE"
+
+          WORKSPACE_ID=$(echo "$RESPONSE" | jq -r '.id')
+
+          if [ -z "$WORKSPACE_ID" ] || [ "$WORKSPACE_ID" = "null" ]; then
+            echo "Workspace creation failed"
+            exit 1
+          fi
+
+          echo "workspace_id=$WORKSPACE_ID" >> "$GITHUB_OUTPUT"
+
+  deploy-content:
+    needs: create-workspace
+    uses: ./.github/workflows/workflow-a.yml
+    with:
+      log_level: ${{ inputs.log_level }}
+      force_delete: ${{ inputs.force_delete }}
+      ado_repo_url: ${{ inputs.ado_repo_url }}
+      deploy_workspace_id: ${{ needs.create-workspace.outputs.workspace_id }}
+    secrets: inherit
