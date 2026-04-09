@@ -1,4 +1,3 @@
-# .github/workflows/orchestrator.yml
 name: Fabric DR Orchestrator
 
 on:
@@ -9,13 +8,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set_matrix.outputs.matrix }}
+
     steps:
       - name: Checkout current repo
         uses: actions/checkout@v4
 
-      # Reads the workspaces.json file, validates it, and sets the matrix for the next job
-      # Change to parameters if needed - to be validated
-      - name: Read JSON and build matrix
+      - name: Read JSON, validate, sort by order, and build matrix
         id: set_matrix
         shell: bash
         run: |
@@ -30,36 +28,46 @@ jobs:
 
           data = json.loads(file_path.read_text(encoding="utf-8"))
 
-          if not isinstance(data, list):
-              raise SystemExit("workspaces.json must contain a JSON array")
+          if not isinstance(data, list) or not data:
+              raise SystemExit("workspaces.json must contain a non-empty JSON array")
 
-          if len(data) == 0:
-              raise SystemExit("workspaces.json is empty")
+          required_fields = ["ado_repo_url", "workspace_name", "capacity_id", "order"]
+          seen_orders = set()
 
           for i, item in enumerate(data):
-              if "ado_repo_url" not in item:
-                  raise SystemExit(f"Entry #{i} is missing ado_repo_url")
-              if "workspace_name" not in item:
-                  raise SystemExit(f"Entry #{i} is missing workspace_name")
+              for field in required_fields:
+                  if field not in item:
+                      raise SystemExit(f"Entry #{i} is missing required field: {field}")
 
-          matrix = {"include": data}
+              if not isinstance(item["order"], int):
+                  raise SystemExit(f"Entry #{i} field 'order' must be an integer")
+
+              if item["order"] in seen_orders:
+                  raise SystemExit(f"Duplicate order value found: {item['order']}")
+
+              seen_orders.add(item["order"])
+
+          ordered = sorted(data, key=lambda x: x["order"])
+          matrix = {"include": ordered}
+
+          print("Ordered matrix:")
+          print(json.dumps(matrix, indent=2))
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
               f.write("matrix=" + json.dumps(matrix) + "\n")
-
-          print(json.dumps(matrix, indent=2))
           PY
 
   recover-each:
     needs: build-matrix
     strategy:
       fail-fast: false
-      max-parallel: 3
+      max-parallel: 1
       matrix: ${{ fromJson(needs.build-matrix.outputs.matrix) }}
-    uses: ./.github/workflows/recover-one-workspace.yml
+
+    uses: ./.github/workflows/workflow-a.yml
     with:
       workspace_name: ${{ matrix.workspace_name }}
-      ado_repo_url: ${{ matrix.ado_repo_url }}
-      log_level: info
-      force_delete: false
+      workspace_id: ${{ matrix.workspace_id }}
+      repo_url: ${{ matrix.repo_url }}
+      capacity_id: ${{ matrix.capacity_id }}
     secrets: inherit

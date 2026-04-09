@@ -1,16 +1,16 @@
 # .github/workflows/workflow-a.yml
-name: Deploy Fabric content
+name: Workflow A - TEST
 
 on:
   workflow_call:
     inputs:
-      log_level:
+      workspace_name:
         required: true
         type: string
-      force_delete:
+      workspace_id:
         required: true
-        type: boolean
-      ado_repo_url:
+        type: string
+      repo_url:
         required: true
         type: string
       deploy_workspace_id:
@@ -32,11 +32,11 @@ jobs:
     steps:
       - name: Debug inputs
         run: |
-          echo "log_level=${{ inputs.log_level }}"
-          echo "force_delete=${{ inputs.force_delete }}"
-          echo "ado_repo_url=${{ inputs.ado_repo_url }}"
-          echo "deploy_workspace_id=${{ inputs.deploy_workspace_id }}"
+          echo "workspace_name=${{ inputs.workspace_name }}"
+          echo "workspace_id=${{ inputs.workspace_id }}"
+          echo "repo_url=${{ inputs.repo_url }}"
+          echo "capacity_id=${{ inputs.capacity_id }}"
 
       - name: Run existing deployment logic
         run: |
-          echo "TODO: invoke your current deploy logic here"
+          echo "TEST: Deploying to workspace ID ${{ inputs.workspace_id }}"

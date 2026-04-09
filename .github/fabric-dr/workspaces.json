@@ -1,6 +1,23 @@
 [
   {
     "ado_repo_url": "https://dev.azure.com/myorg/myproject/_git/repo1",
-    "workspace_name": "dr-repo3"
+    "workspace_name": "dr-wsc-tst-bo1",
+    "workspace_id": "aaaaaaaaaa-9e61-42ee-9e25-b8059fe3d73f",
+    "capacity_id": "aaaaaaaaa-9e61-42ee-9e25-b8059fe3d73f",
+    "order": 1
+  },
+  {
+    "ado_repo_url": "https://dev.azure.com/myorg/myproject/_git/repo2",
+    "workspace_name": "dr-wsc-tst-bo2",
+    "workspace_id": "ddddddddddd-9e61-42ee-9e25-b8059fe3d73f",
+    "capacity_id": "bbbbbbbbb-9e61-42ee-9e25-b8059fe3d73f",
+    "order": 3
+  },
+  {
+    "ado_repo_url": "https://dev.azure.com/myorg/myproject/_git/repo3",
+    "workspace_name": "dr-wsc-tst-bo3",
+    "workspace_id": "hhhhhhhhhhhh-9e61-42ee-9e25-b8059fe3d73f",
+    "capacity_id": "ccccccccccc-9e61-42ee-9e25-b8059fe3d73f",
+    "order": 2
   }
 ]
